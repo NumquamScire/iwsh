@@ -214,14 +214,15 @@ exec 5>&2;
 
 lcurl () {
     if [[ " ${CURL_ARGS[@]} " =~ "-X POST" ]]; then
-        timeout $CURL_MAXTIME curl -s $URL "${CURL_ARGS[@]}" --data $1
+        timeout $CURL_MAXTIME curl -s $URL "${CURL_ARGS[@]}" --data $1 2>1 >/dev/null
     else
-        timeout $CURL_MAXTIME curl -s $URL?$1 "${CURL_ARGS[@]}"
+        timeout $CURL_MAXTIME curl -s $URL?$1 "${CURL_ARGS[@]}" 2>1 >/dev/null
     fi
 }
 
 get_output () {
-    stdbuf -o0 curl -s $URL?o=$FO "${CURL_ARGS[@]}" 2>&5 >&5 
+#    stdbuf -o0 curl -s $URL?o=$FO "${CURL_ARGS[@]}" 2>&5 >&5 
+    curl -s -N $URL?o=$FO "${CURL_ARGS[@]}" 2>&5 >&5 
 }
 
 
@@ -306,9 +307,9 @@ read_command_full_stty() {
         userInput=$(dd bs=1 count=1 2>/dev/null)
         combination+="$userInput"
         # Check if the user wants to exit
-        if [ "$combination" == $'\x1b\x11' ]; then
+        if [[ "$combination" == *$'\x1b\x11'* ]]; then
             exit_client "0"
-        elif [[ "$combination" == $'\x1b\x13' ]]; then
+        elif [[ "$combination" == *$'\x1b\x13'* ]]; then
             full_stty="no"
             echo "Change to normal mode stty!"
             break
