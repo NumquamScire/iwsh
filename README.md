@@ -48,6 +48,7 @@ The project consists of two files: 1) client is written in bash by use **curl** 
 - `-fi`, `--fi`: Interactive shell works on named pipes, so change name of stdin pipe: `--fi /dev/shm/some_input_pipe`
 - `-fo`, `--fo`: Interactive shell works on named pipes, so change name of stdout, stderr pipe: `--fo /dev/shm/some_output_pipe`
 - `-d`, `--default`: Script by default works with no interactive webshell. So flags set default interacte option: `--interactive`, `--stty-raw`, `--stty-python`, `--alias`. If you want change some of option you need provide next option after default options. `-d --stty-script --shell /bin/bash`
+- `--attach`: Join a detached running shell process. To join the right shell, you need to use the same pipes that the shell process uses: `--attach --fi /dev/shm/i --fo /dev/shm/o`
 
 To exit in normal mode stty usage: `ctrl+c` or write: `%:exit`. To exit in raw mode stty usage: `ctrl+alt+q`
 
