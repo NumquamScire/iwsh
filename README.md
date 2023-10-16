@@ -7,11 +7,11 @@
 I was inspired by a situation where I couldn't create any new connections except for web connections over the HTTP protocol.
 After spending several days i didn't find works solution. First problem is was create established process, so project create independent process of http requests on server. 
 
-This project communicate over named pipes that create in file system. Interactive shell using two pipes. First pipe for **stdin** default `/tmp/i` that web server write data to from user. Second pipe use for **stdout** and **stderr** defualt `/tmp/o` that web server read data from shell and return to user via Chunked Transfer Encoding that available in `HTTP/1.1`. Streaming data transfer from **stdout** and **stderr** helps reduce the number of requests. I recommend use direcotry `/dev/shm` instead of `/tmp` or other directory that do not leave any fingerprints on disk.
+This project communicate over named pipes that create in file system. Interactive shell using two pipes. First pipe for **stdin** default `/tmp/i` that web server write data to from user. Second pipe use for **stdout** and **stderr** defualt `/tmp/o` that web server read data from shell and return to user via Chunked Transfer Encoding that available in `HTTP/1.1`. Streaming data transfer from **stdout** and **stderr** helps reduce the number of requests. I recommend use direcotry `/dev/shm` instead of `/tmp` or other directory that do not leave any fingerprints on disk. `--stream` helps reduce the number of requests to just two. All data will be sent over a TCP connection. Currently only available for Java Servlet. 
 
 The project consists of two files: 1) client is written in bash by use **curl** for communication with web server. 2) page for web server for communicate with client and server-side shell.
 
-**Curl** has some limitation for request chunked, so not easily create two-way streaming use curl. I believe that can be created by other client or even better use one page on server with javascript for create full interactive webshell in browser. I don't know very well JavaScript and all of web stack that spend time for create some of this. So I hope someone will be interested in continuing to help develop the project.
+**PHP** has some limitation for request chunked, so not easily create two-way streaming for PHP server. I believe that can be created by other client or even better use one page on server with javascript for create full interactive webshell in browser. I don't know very well JavaScript and all of web stack that spend time for create some of this. So I hope someone will be interested in continuing to help develop the project.
 
 ---
 
@@ -49,6 +49,7 @@ The project consists of two files: 1) client is written in bash by use **curl** 
 - `-fo`, `--fo`: Interactive shell works on named pipes, so change name of stdout, stderr pipe: `--fo /dev/shm/some_output_pipe`
 - `-d`, `--default`: Script by default works with no interactive webshell. So flags set default interacte option: `--interactive`, `--stty-raw`, `--stty-python`, `--alias`. If you want change some of option you need provide next option after default options. `-d --stty-script --shell /bin/bash`
 - `--attach`: Join a detached running shell process. To join the right shell, you need to use the same pipes that the shell process uses: `--attach --fi /dev/shm/i --fo /dev/shm/o`
+- `--stream`: Create request stream. Available for Java Servlet, not working with php: `--stream`
 
 To exit in normal mode stty usage: `ctrl+c` or write: `%:exit`. To exit in raw mode stty usage: `ctrl+alt+q`
 
