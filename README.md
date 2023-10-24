@@ -20,9 +20,10 @@ The project consists of two files: 1) client is written in bash by use **curl** 
 	Example: `./client --url http://localhost/mypage.php` 
 2. Run command in interactive shell without tty 
 	Example: `./client --url http://localhost/mypage.php -i`
-3. Run command in interactive shell with tty. For this option client has several predefined command for spawning pseudo tty: `--stty-python`, `--stty-expect`, `--stty-script`. You can use own command for spawning tty. You must provide the command as one argument, so please don't forget `\"` use: `--stty-custom "/custom/path/python2.7 -c \"import pty; pty.spawn('/bin/zsh')\""`
+3. Run command in interactive shell with tty. For this option client has several predefined command for spawning pseudo tty: `--stty-python`, `--stty-expect`, `--stty-script`. If you want change path to binary file just add path after flag, for example change path to python: `--stty-python /usr/bin/python3.7` You can use own command for spawning tty. You must provide the command as one argument, so please don't forget `\"` use: `--stty-custom "/custom/path/python2.7 -c \"import pty; pty.spawn('/bin/zsh')\""`
     Example: `./client --url http://localhost/mypage.php -i --stty-raw --stty-python --alias`
 
+   
 ###### Stty options:
 - By default client running in normal mode and read command line by line. In this mode client can't read special keys some of `ctrl+c`, `ctrl+d`, `ctrl+r`, `ctrl+l` and *etc*.
 - When you want change **stty option** you don't need push `ctrl+z` after run command: `stty raw -echo; fg` Instead you must use client commands, because client use two different approach for reading input in different modes.
@@ -50,6 +51,9 @@ The project consists of two files: 1) client is written in bash by use **curl** 
 - `-d`, `--default`: Script by default works with no interactive webshell. So flags set default interacte option: `--interactive`, `--stty-raw`, `--stty-python`, `--alias`. If you want change some of option you need provide next option after default options. `-d --stty-script --shell /bin/bash`
 - `--attach`: Join a detached running shell process. To join the right shell, you need to use the same pipes that the shell process uses: `--attach --fi /dev/shm/i --fo /dev/shm/o`
 - `--stream`: Create request stream. Available for Java Servlet, not working with php: `--stream`
+- `--socks5-bash`: Create socks5 server. Connection to destination host via bash. You can set up special path to bash: `--socks5-bash /bin/bash`
+- `--socks5-path`: Set up path where will save named pipes for each one connection. Default `/dev/shm/`: `--socks5-path /tmp`
+- `--socks5-port`: Set up port for socks5 server by default `1080`: `--socks5-port 9050`
 
 To exit in normal mode stty usage: `ctrl+c` or write: `%:exit`. To exit in raw mode stty usage: `ctrl+alt+q`
 
