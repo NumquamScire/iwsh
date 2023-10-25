@@ -643,9 +643,7 @@ socks5_server () {
             while true; do
     chart=$(if timeout 0.1 cat - ; then exit_thread "1"; fi | xxd -p | sed 's/\(..\)/%\1/g' | tr -d '\n');
                 if ! [[ -p "$pi" ]]; then
-                    echo "file $pi not found " >> /dev/shm/error_1
                     break
-                    #exit_thread "1"
                 fi
 
                 if [[ "$chart" != "" ]]; then
@@ -670,17 +668,17 @@ socks5_server () {
                 res=$(timeout 10 curl -s $URL"?c=$line" "${CURL_ARGS[@]}") 
             fi
         }
-        version=$(dd bs=1 count=1 status=none | xxd -p | sed 's/\(..\)/\\x\1/g')
+        version=$(timeout 10 dd bs=1 count=1 status=none | xxd -p | sed 's/\(..\)/\\x\1/g')
         if [ "$version" != "\x05" ]; then
             echo -ne "\x05\xff" 
             exit_thread "1"
         fi
 
-        count_methods_auth_hex=$(dd bs=1 count=1 status=none 2>/dev/null | xxd -p | sed 's/\(..\)/\\x\1/g')
+        count_methods_auth_hex=$(timeout 10 dd bs=1 count=1 status=none 2>/dev/null | xxd -p | sed 's/\(..\)/\\x\1/g')
         count_methods_auth=$((16#"${count_methods_auth_hex:2:2}"))
         method="false"
         for (( i=1; i<=count_methods_auth; i++ )); do
-            method_auth=$(dd bs=1 count=1 status=none 2>/dev/null | xxd -p | sed 's/\(..\)/\\x\1/g')
+            method_auth=$(timeout 10 dd bs=1 count=1 status=none 2>/dev/null | xxd -p | sed 's/\(..\)/\\x\1/g')
             if [ "$method_auth" = "\x00" ]; then
                 echo -ne "\x05\x00" 
                 method="true"
@@ -700,44 +698,43 @@ socks5_server () {
         port=""
         answer=""
 
-        version=$(dd bs=1 count=1 status=none | xxd -p | sed 's/\(..\)/\\x\1/g')
+        version=$(timeout 10 dd bs=1 count=1 status=none | xxd -p | sed 's/\(..\)/\\x\1/g')
         if [ "$version" != "\x05" ]; then
             echo -ne "\x05\x01\x00\x01\x00\x00\x00\x00\x00\x00"
             exit_thread "0"
         else
-            cmd=$(dd bs=1 count=1 status=none | xxd -p | sed 's/\(..\)/\\x\1/g')
+            cmd=$(timeout 10 dd bs=1 count=1 status=none | xxd -p | sed 's/\(..\)/\\x\1/g')
             if [ "$cmd" != "\x01" ]; then
                 echo -ne "\x05\x01\x00\x01\x00\x00\x00\x00\x00\x00"
                 exit_thread "0"
             else
-                reserved_byte=$(dd bs=1 count=1 status=none | xxd -p | sed 's/\(..\)/\\x\1/g')
+                reserved_byte=$(timeout 10 dd bs=1 count=1 status=none | xxd -p | sed 's/\(..\)/\\x\1/g')
                 if [ "$reserved_byte" != "\x00" ]; then
                     echo -ne "\x05\x01\x00\x01\x00\x00\x00\x00\x00\x00"
                     exit_thread "0"
                 else
-                    addr_type=$(dd bs=1 count=1 status=none | xxd -p | sed 's/\(..\)/\\x\1/g')
+                    addr_type=$(timeout 10 dd bs=1 count=1 status=none | xxd -p | sed 's/\(..\)/\\x\1/g')
                     if [ "$addr_type" = "\x01" ]; then
-                        addr_ip=$(dd bs=1 count=4 status=none | xxd -p | sed 's/\(..\)/\\x\1/g')
-                        addr_port=$(dd bs=1 count=2 status=none | xxd -p | sed 's/\(..\)/\\x\1/g')
+                        addr_ip=$(timeout 10 dd bs=1 count=4 status=none | xxd -p | sed 's/\(..\)/\\x\1/g')
+                        addr_port=$(timeout 10 dd bs=1 count=2 status=none | xxd -p | sed 's/\(..\)/\\x\1/g')
                         ip="$((16#${addr_ip:2:2})).$((16#${addr_ip:6:2})).$((16#${addr_ip:10:2})).$((16#${addr_ip:14:2}))"
                         port=$((16#$(echo -n $addr_port | tr -d '\\x')))
-                        #echo "ip: $ip port:$port"
-                        connect "$ip" "$port" "$stdi" "$stdo" "$exit_string" "$connect_string" &
                         answer="\x05\x00\x00\x01$addr_ip$addr_port"
                     elif [ "$addr_type" = "\x03" ]; then
-                        domain_length_hex=$(dd bs=1 count=1 status=none | xxd -p | sed 's/\(..\)/\\x\1/g')
+                        domain_length_hex=$(timeout 10 dd bs=1 count=1 status=none | xxd -p | sed 's/\(..\)/\\x\1/g')
                         domain_length=$((16#"${domain_length_hex:2:2}"))
-                        addr_ip=$(dd bs=1 count=$domain_length status=none | xxd -p | sed 's/\(..\)/\\x\1/g')
-                        addr_port=$(dd bs=1 count=2 status=none | xxd -p | sed 's/\(..\)/\\x\1/g')
+                        addr_ip=$(timeout 10 dd bs=1 count=$domain_length status=none | xxd -p | sed 's/\(..\)/\\x\1/g')
+                        addr_port=$(timeout 10 dd bs=1 count=2 status=none | xxd -p | sed 's/\(..\)/\\x\1/g')
                         ip="$(echo -ne $addr_ip)"
                         port=$((16#$(echo -n $addr_port | tr -d '\\x')))
-                        connect "$ip" "$port" "$stdi" "$stdo" "$exit_string" "$connect_string" &
                         answer="\x05\x00\x00\x03$domain_length_hex$addr_ip$addr_port"
                     else
                         echo -ne "\x05\x08\x00\x01\x00\x00\x00\x00\x00\x00"
                         exit_thread "0"
                     fi
 
+                    connect "$ip" "$port" "$stdi" "$stdo" "$exit_string" "$connect_string" &
+                    sleep 0.5
                     (curl -s -N --retry 10 --retry-connrefused --retry-delay 1 "$URL?o=$stdo" "${CURL_ARGS[@]}" | tee "$pi" | dd bs=1024 skip=20 2>/dev/null) &
                     pid_curl=$!
 
