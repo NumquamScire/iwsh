@@ -148,6 +148,7 @@ help_client () {
     printf "  %s  %-20s%s\n" "      " "--attach" "Join a detached running shell process. To join the right shell, you need to use the same pipes that the shell process uses: {--attach --fi /dev/shm/i --fo /dev/shm/o}"
     printf "  %s  %-20s%s\n" "      " "--stream" "Create request stream. Available for Java Servlet, not working with php: {--stream}"
     printf "  %s  %-20s%s\n" "      " "--socks5-bash" "Create socks5 server. Connection to destination host via bash. You Can set up special path to bash: {--socks5-bash /bin/bash }"
+    printf "  %s  %-20s%s\n" "      " "--socks5-python" "Create socks5 server. Connection to destination host via python. You Can set up special path to python: {--socks5-python /bin/python3 }"
     printf "  %s  %-20s%s\n" "      " "--socks5-path" "Set up path where will save named pipes for each one connection. Default '/dev/shm/': {--socks5-path /tmp }"
     printf "  %s  %-20s%s\n" "      " "--socks5-port" "Set up port for socks5 server by default 1080: {--socks5-port 9050 }"
     printf "  %s  %-20s%s\n" "      " "" "To exit in normal mode stty usage: {ctrl+c} or write: {%:exit}. To exit in raw mode stty usage: {ctrl+alt+q}"
