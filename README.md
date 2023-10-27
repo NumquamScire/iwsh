@@ -52,6 +52,7 @@ The project consists of two files: 1) client is written in bash by use **curl** 
 - `--attach`: Join a detached running shell process. To join the right shell, you need to use the same pipes that the shell process uses: `--attach --fi /dev/shm/i --fo /dev/shm/o`
 - `--stream`: Create request stream. Available for Java Servlet, not working with php: `--stream`
 - `--socks5-bash`: Create socks5 server. Connection to destination host via bash. You can set up special path to bash: `--socks5-bash /bin/bash`
+- `--socks5-python`: Create socks5 server. Connection to destination host via python. You can set up special path to python: `--socks5-bash /bin/python3`
 - `--socks5-path`: Set up path where will save named pipes for each one connection. Default `/dev/shm/`: `--socks5-path /tmp`
 - `--socks5-port`: Set up port for socks5 server by default `1080`: `--socks5-port 9050`
 
