@@ -13,6 +13,10 @@ The project consists of two files: 1) client is written in bash by use **curl** 
 
 **PHP** has some limitation for request chunked, so not easily create two-way streaming for PHP server. I believe that can be created by other client or even better use one page on server with javascript for create full interactive webshell in browser. I don't know very well JavaScript and all of web stack that spend time for create some of this. So I hope someone will be interested in continuing to help develop the project.
 
+
+https://github.com/NumquamScire/iwsh/assets/147640410/96a49ffc-d5d2-4f03-b40e-49ff8568081f
+
+
 ---
 
 ###### Available options in client:
