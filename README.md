@@ -63,7 +63,7 @@ https://github.com/NumquamScire/iwsh/assets/147640410/96a49ffc-d5d2-4f03-b40e-49
 To exit in normal mode stty usage: `ctrl+c` or write: `%:exit`. To exit in raw mode stty usage: `ctrl+alt+q`
 
 If you want **create several instance** of client with interactive shells you need use **different pipes** for everyone instance by use: `--fi` and `--fo`
-Don't forget that sever-side process will running even client is close. So if you don't want leaving running process on server-side and leaving any files, You have to manually kill process and remove files. 
+Don't forget that sever-side process will running even client is close. So if you don't want leaving running process on server-side and leaving any files, You have to `exit` from shell or manually kill process and remove files. 
 
 ---
 
