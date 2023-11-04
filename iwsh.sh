@@ -387,9 +387,9 @@ lcurl () {
     local CURL_ARGS=()
     eval "CURL_ARGS=($(get_config_value "CURL_ARGS"))" 2>/dev/null
     if [[ " ${CURL_ARGS[@]} " =~ "-X POST" ]]; then
-        timeout $CURL_MAXTIME curl -s $URL "${CURL_ARGS[@]}" --data $1 2>1 >/dev/null
+        timeout $CURL_MAXTIME curl -s $URL "${CURL_ARGS[@]}" --data $1 2>&1 >/dev/null
     else
-        timeout $CURL_MAXTIME curl -s $URL?$1 "${CURL_ARGS[@]}" 2>1 >/dev/null
+        timeout $CURL_MAXTIME curl -s $URL?$1 "${CURL_ARGS[@]}" 2>&1 >/dev/null
     fi
 }
 
@@ -499,7 +499,7 @@ send_command_stream () {
     local URL="$(get_config_value "URL")" 
     local CURL_ARGS=()
     eval "CURL_ARGS=($(get_config_value "CURL_ARGS"))" 2>/dev/null
-    curl -s -N -X POST $URL"?s=$FI" "${CURL_ARGS[@]}" -T - <&7 2>1 >/dev/null
+    curl -s -N -X POST $URL"?s=$FI" "${CURL_ARGS[@]}" -T - <&7 2>&1 >/dev/null
     cat $FIFO_PATH >/dev/null
 }
 
@@ -636,9 +636,9 @@ socks5_server () {
         lcurl () {
             local CURL_MAXTIME=1
             if [[ " ${CURL_ARGS[@]} " =~ "-X POST" ]]; then
-                timeout $CURL_MAXTIME curl -s $URL "${CURL_ARGS[@]}" --data $1 2>1 >/dev/null
+                timeout $CURL_MAXTIME curl -s $URL "${CURL_ARGS[@]}" --data $1 2>&1 >/dev/null
             else
-                timeout $CURL_MAXTIME curl -s $URL?$1 "${CURL_ARGS[@]}" 2>1 >/dev/null
+                timeout $CURL_MAXTIME curl -s $URL?$1 "${CURL_ARGS[@]}" 2>&1 >/dev/null
             fi
         }
 
