@@ -49,6 +49,7 @@ if (isset($_REQUEST['o']) || isset($_REQUEST['i']) || isset($_REQUEST['c']) || i
                     break;
                 }
                 sendChunk($data);
+                continue;
             }
             usleep(100000); 
         }
